@@ -4,34 +4,33 @@
     <meta charset="UTF-8">
     <title>Workspace Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 700px; margin: 30px auto; text-align: center; }
-        #qr-container { padding: 20px; border: 1px solid #ddd; display: inline-block; border-radius: 8px; }
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; text-align: center; }
+        #qr-box { border: 1px solid #ccc; padding: 20px; display: inline-block; border-radius: 8px; margin-top: 15px; }
+        #qr-image { width: 250px; height: 250px; display: none; margin: 0 auto; }
         #main-app { display: none; text-align: left; }
-        #chat-list { border: 1px solid #ccc; height: 300px; overflow-y: auto; padding: 10px; }
+        .chat-item { padding: 10px; border-bottom: 1px solid #eee; }
     </style>
 </head>
 <body>
 
-    <!-- Екран авторизації -->
     <div id="auth-screen">
         <h2>Авторизація через QR-код</h2>
-        <p>Відкрийте Telegram на телефоні ➔ Налаштування ➔ Пристрої ➔ Підключити пристрій</p>
-        <div id="qr-container">
-            <img id="qr-image" src="" alt="Скануйте QR-код" style="display:none; width: 250px;">
-            <p id="qr-status">Генерація QR-коду...</p>
+        <p>Telegram ➔ Налаштування ➔ Пристрої ➔ Підключити пристрій</p>
+        <div id="qr-box">
+            <p id="status-text">Завантаження та генерація QR...</p>
+            <img id="qr-image" src="" alt="QR Code">
         </div>
     </div>
 
-    <!-- Основний інтерфейс (показується після входу) -->
     <div id="main-app">
-        <h2>Personal Workspace</h2>
+        <h2>Останні чати</h2>
         <div id="chat-list"></div>
     </div>
 
     <script>
-        async function checkAuth() {
+        async function checkStatus() {
             try {
-                const res = await fetch('/api/auth/qr');
+                const res = await fetch('/api/auth/status');
                 const data = await res.json();
 
                 if (data.status === 'authorized') {
@@ -39,26 +38,28 @@
                     document.getElementById('main-app').style.display = 'block';
                     loadDialogs();
                 } else if (data.status === 'qr') {
-                    document.getElementById('qr-image').src = data.qr;
-                    document.getElementById('qr-image').style.display = 'block';
-                    document.getElementById('qr-status').style.display = 'none';
-                    setTimeout(checkAuth, 2000);
+                    document.getElementById('status-text').style.display = 'none';
+                    const img = document.getElementById('qr-image');
+                    img.src = data.qr;
+                    img.style.display = 'block';
+                    setTimeout(checkStatus, 2000);
                 } else {
-                    setTimeout(checkAuth, 2000);
+                    setTimeout(checkStatus, 2000);
                 }
-            } catch (e) {
-                setTimeout(checkAuth, 3000);
+            } catch (err) {
+                console.error(err);
+                setTimeout(checkStatus, 3000);
             }
         }
 
         async function loadDialogs() {
             const res = await fetch('/api/dialogs');
             const dialogs = await res.json();
-            const list = document.getElementById('chat-list');
-            list.innerHTML = dialogs.map(d => `<div><strong>${d.name}</strong> (ID: ${d.id})</div>`).join('');
+            const container = document.getElementById('chat-list');
+            container.innerHTML = dialogs.map(d => `<div class="chat-item"><strong>${d.name}</strong></div>`).join('');
         }
 
-        checkAuth();
+        checkStatus();
     </script>
 </body>
 </html>
