@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>My Workspace Notes</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
+        #chat-box { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; }
+        .message { margin-bottom: 8px; padding: 5px; background: #f1f1f1; border-radius: 4px; }
+        input, button { padding: 8px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <h2>Personal Workspace Notes</h2>
+    
+    <div id="chat-box"></div>
+
+    <input type="text" id="chatIdInput" placeholder="Chat ID (напр. ваш ID)">
+    <input type="text" id="messageInput" placeholder="Введіть текст...">
+    <button onclick="sendMessage()">Надіслати</button>
+
+    <script>
+        async function fetchMessages() {
+            try {
+                const res = await fetch('/api/messages');
+                const data = await res.json();
+                const chatBox = document.getElementById('chat-box');
+                chatBox.innerHTML = '';
+                
+                if (data.result) {
+                    data.result.forEach(update => {
+                        if (update.message) {
+                            const div = document.createElement('div');
+                            div.className = 'message';
+                            div.innerText = `${update.message.from.first_name}: ${update.message.text}`;
+                            chatBox.appendChild(div);
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function sendMessage() {
+            const chatId = document.getElementById('chatIdInput').value;
+            const text = document.getElementById('messageInput').value;
+            if (!chatId || !text) return;
+
+            await fetch('/api/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chatId, text })
+            });
+
+            document.getElementById('messageInput').value = '';
+            fetchMessages();
+        }
+
+        // Автоматичне оновлення кожні 3 секунди
+        setInterval(fetchMessages, 3000);
+        fetchMessages();
+    </script>
+</body>
+</html>
