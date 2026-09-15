@@ -1,41 +1,73 @@
 const express = require('express');
-const axios = require('axios');
+const { TelegramClient } = require('telegram');
+const { StringSession } = require('telegram/sessions');
+const QRCode = require('qrcode');
 const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Токен вашого бота від BotFather
-const BOT_TOKEN = process.env.BOT_TOKEN || '8811130587:AAETUnfv2zvbcNoRN9pR4cTu5uOKo2TNklM';
-const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
+// Отримати на my.telegram.org
+const API_ID = parseInt(process.env.API_ID || '123456');
+const API_HASH = process.env.API_HASH || 'YOUR_API_HASH';
+
+const stringSession = new StringSession("");
+const client = new TelegramClient(stringSession, API_ID, API_HASH, {
+    connectionRetries: 5,
+});
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Отримання останніх повідомлень, які прийшли боту
-app.get('/api/messages', async (req, res) => {
+let currentQrCode = '';
+let isAuthorized = false;
+
+// Отримання QR-коду або стану авторизації
+app.get('/api/auth/qr', async (req, res) => {
+    if (isAuthorized) {
+        return res.json({ status: 'authorized' });
+    }
+
+    if (!client.connected) {
+        await client.connect();
+    }
+
     try {
-        const response = await axios.get(`${TELEGRAM_API}/getUpdates`);
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+        await client.signInUserWithQrCode(
+            { apiId: API_ID, apiHash: API_HASH },
+            {
+                onError: (err) => console.error(err),
+                qrCode: async (qr) => {
+                    const url = `tg://login?token=${qr.token.toString("base64url")}`;
+                    currentQrCode = await QRCode.toDataURL(url);
+                },
+            }
+        );
+        isAuthorized = true;
+        currentQrCode = '';
+        res.json({ status: 'authorized' });
+    } catch (e) {
+        if (currentQrCode) {
+            res.json({ status: 'qr', qr: currentQrCode });
+        } else {
+            res.json({ status: 'waiting' });
+        }
     }
 });
 
-// Відправка повідомлення через бота
-app.post('/api/send', async (req, res) => {
-    const { chatId, text } = req.body;
+// Отримання списку останніх діалогів
+app.get('/api/dialogs', async (req, res) => {
+    if (!isAuthorized) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const response = await axios.post(`${TELEGRAM_API}/sendMessage`, {
-            chat_id: chatId,
-            text: text
-        });
-        res.json(response.data);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+        const dialogs = await client.getDialogs({ limit: 15 });
+        const result = dialogs.map(d => ({
+            id: d.id.toString(),
+            name: d.title || d.name || 'Chat'
+        }));
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
