@@ -6,7 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Токен вашого бота від BotFather
-const BOT_TOKEN = process.env.BOT_TOKEN || 'ВАШ_TELEGRAM_BOT_TOKEN';
+const BOT_TOKEN = process.env.BOT_TOKEN || '8811130587:AAETUnfv2zvbcNoRN9pR4cTu5uOKo2TNklM';
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 app.use(express.json());
