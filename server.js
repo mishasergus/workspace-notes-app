@@ -11,7 +11,7 @@ const API_ID = parseInt(process.env.API_ID || '0');
 const API_HASH = process.env.API_HASH || '';
 
 const stringSession = new StringSession("");
-const client = new TelegramClient(stringSession, API_ID, API_HASH, {
+let client = new TelegramClient(new StringSession(""), API_ID, API_HASH, {
     connectionRetries: 5,
 });
 
@@ -26,6 +26,11 @@ let userPassword = null;
 async function startQrAuth() {
     try {
         await client.connect();
+        
+        if (await client.checkAuthorization()) {
+            await client.logOut();
+        }
+        
         await client.signInUserWithQrCode(
             { apiId: API_ID, apiHash: API_HASH },
             {
@@ -130,7 +135,13 @@ app.post('/api/auth/logout', async (req, res) => {
         needs2FA = false;
         
         await client.disconnect();
-        
+
+        // Створюємо чистий екземпляр клієнта з порожньою сесією
+        client = new TelegramClient(new StringSession(""), API_ID, API_HASH, {
+            connectionRetries: 5,
+        });
+
+        // Запускаємо генерацію нового QR
         startQrAuth();
         
         res.json({ success: true });
