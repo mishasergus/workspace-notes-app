@@ -123,4 +123,21 @@ app.post('/api/send', async (req, res) => {
     }
 });
 
+app.post('/api/auth/logout', async (req, res) => {
+    try {
+        isAuthenticated = false;
+        qrCodeUrl = '';
+        needs2FA = false;
+        
+        await client.disconnect();
+        
+        startQrAuth();
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Logout error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
