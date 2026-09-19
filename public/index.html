@@ -6,24 +6,22 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f4f9; }
-        #auth-screen { max-width: 400px; margin: 50px auto; text-align: center; background: #fff; padding: 20px; border-radius: 8px; }
-        #qr-image { width: 200px; display: none; margin: 10px auto; }
+        #auth-screen { max-width: 400px; margin: 50px auto; text-align: center; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        #qr-image { width: 200px; display: none; margin: 15px auto; }
+        #2fa-box { display: none; margin-top: 15px; }
+        #2fa-box input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        #2fa-box button { width: 100%; padding: 10px; background: #0088cc; color: white; border: none; border-radius: 4px; cursor: pointer; }
         
         #main-app { display: none; height: 100vh; }
         .app-container { display: flex; height: 100%; }
-        
-        /* Сайдбар з чатами */
         .sidebar { width: 300px; border-right: 1px solid #ccc; background: #fff; overflow-y: auto; }
         .chat-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; }
         .chat-item:hover, .chat-item.active { background: #e9f0f8; }
-        
-        /* Основне вікно чату */
         .chat-window { flex: 1; display: flex; flex-direction: column; background: #fff; }
         .messages-box { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
         .msg { max-width: 70%; padding: 8px 12px; border-radius: 8px; word-break: break-word; }
         .msg.in { background: #f1f1f1; align-self: flex-start; }
         .msg.out { background: #0088cc; color: #fff; align-self: flex-end; }
-        
         .input-area { display: flex; padding: 10px; border-top: 1px solid #ccc; background: #fafafa; }
         .input-area input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; outline: none; }
         .input-area button { padding: 10px 20px; margin-left: 8px; background: #0088cc; color: white; border: none; border-radius: 4px; cursor: pointer; }
@@ -32,12 +30,13 @@
 <body>
 
     <div id="auth-screen">
-        <h3>Авторизація</h3>
+        <h3>Авторизація Telegram</h3>
         <p id="status-text">Завантаження...</p>
-        <img id="qr-image" src="" alt="QR">
-        <div id="2fa-container" style="display: none; margin-top: 15px;">
-            <input type="password" id="2fa-input" placeholder="Введіть 2FA пароль..." style="padding: 8px; width: 80%;">
-            <button onclick="sendPassword()" style="padding: 8px 12px; margin-top: 5px;">Підтвердити</button>
+        <img id="qr-image" src="" alt="QR Code">
+        
+        <div id="2fa-box">
+            <input type="password" id="pass-input" placeholder="Введіть 2FA пароль...">
+            <button onclick="sendPassword()">Увійти</button>
         </div>
     </div>
 
@@ -63,21 +62,50 @@
             try {
                 const res = await fetch('/api/auth/status');
                 const data = await res.json();
+                
+                const qrImg = document.getElementById('qr-image');
+                const faBox = document.getElementById('2fa-box');
+                const statusText = document.getElementById('status-text');
+
                 if (data.status === 'authorized') {
                     document.getElementById('auth-screen').style.display = 'none';
                     document.getElementById('main-app').style.display = 'block';
                     loadDialogs();
+                    return; // Зупиняємо поллінг
+                } 
+                
+                if (data.status === '2fa_required') {
+                    statusText.innerText = 'Введіть хмарний пароль (2FA):';
+                    qrImg.style.display = 'none';
+                    faBox.style.display = 'block';
                 } else if (data.status === 'qr') {
-                    document.getElementById('status-text').innerText = 'Скануйте QR-код в Telegram';
-                    const img = document.getElementById('qr-image');
-                    img.src = data.qr;
-                    img.style.display = 'block';
-                    document.getElementById('2fa-container').style.display = 'block';
-                    setTimeout(checkStatus, 2000);
+                    statusText.innerText = 'Скануйте QR-код в Telegram:';
+                    qrImg.src = data.qr;
+                    qrImg.style.display = 'block';
+                    faBox.style.display = 'none';
                 } else {
-                    setTimeout(checkStatus, 2000);
+                    statusText.innerText = 'Ініціалізація...';
                 }
-            } catch (err) { setTimeout(checkStatus, 3000); }
+
+                setTimeout(checkStatus, 2000);
+            } catch (err) { 
+                setTimeout(checkStatus, 3000); 
+            }
+        }
+
+        async function sendPassword() {
+            const password = document.getElementById('pass-input').value;
+            if (!password) return;
+
+            document.getElementById('status-text').innerText = 'Перевірка пароля...';
+            
+            await fetch('/api/auth/password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+
+            document.getElementById('pass-input').value = '';
         }
 
         async function loadDialogs() {
@@ -123,21 +151,6 @@
             loadMessages();
         }
 
-        async function sendPassword() {
-            const password = document.getElementById('2fa-input').value;
-            if (!password) return;
-            
-            await fetch('/api/auth/password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password })
-            });
-            
-            document.getElementById('2fa-input').value = '';
-            document.getElementById('status-text').innerText = 'Перевірка пароля...';
-        }
-
-        // Автооновлення активного чату кожні 3 секунди
         setInterval(() => { if (currentChatId) loadMessages(); }, 3000);
 
         checkStatus();
