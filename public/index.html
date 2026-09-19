@@ -35,6 +35,10 @@
         <h3>Авторизація</h3>
         <p id="status-text">Завантаження...</p>
         <img id="qr-image" src="" alt="QR">
+        <div id="2fa-container" style="display: none; margin-top: 15px;">
+            <input type="password" id="2fa-input" placeholder="Введіть 2FA пароль..." style="padding: 8px; width: 80%;">
+            <button onclick="sendPassword()" style="padding: 8px 12px; margin-top: 5px;">Підтвердити</button>
+        </div>
     </div>
 
     <div id="main-app">
@@ -68,6 +72,7 @@
                     const img = document.getElementById('qr-image');
                     img.src = data.qr;
                     img.style.display = 'block';
+                    document.getElementById('2fa-container').style.display = 'block';
                     setTimeout(checkStatus, 2000);
                 } else {
                     setTimeout(checkStatus, 2000);
@@ -116,6 +121,20 @@
                 body: JSON.stringify({ chatId: currentChatId, text })
             });
             loadMessages();
+        }
+
+        async function sendPassword() {
+            const password = document.getElementById('2fa-input').value;
+            if (!password) return;
+            
+            await fetch('/api/auth/password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+            
+            document.getElementById('2fa-input').value = '';
+            document.getElementById('status-text').innerText = 'Перевірка пароля...';
         }
 
         // Автооновлення активного чату кожні 3 секунди
