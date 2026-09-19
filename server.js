@@ -20,6 +20,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 let qrCodeUrl = '';
 let isAuthenticated = false;
+let userPassword = null;
 
 async function startQrAuth() {
     try {
@@ -27,6 +28,14 @@ async function startQrAuth() {
         await client.signInUserWithQrCode(
             { apiId: API_ID, apiHash: API_HASH },
             {
+                password: async () => {
+                    while (!userPassword) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                    const pass = userPassword;
+                    userPassword = null;
+                    return pass;
+                },
                 onError: (err) => console.log('QR Auth Error:', err.message),
                 qrCode: async (qr) => {
                     const url = `tg://login?token=${qr.token.toString("base64url")}`;
@@ -47,6 +56,16 @@ app.get('/api/auth/status', (req, res) => {
     if (isAuthenticated) return res.json({ status: 'authorized' });
     if (qrCodeUrl) return res.json({ status: 'qr', qr: qrCodeUrl });
     res.json({ status: 'loading' });
+});
+
+app.post('/api/auth/password', (req, res) => {
+    const { password } = req.body;
+    if (password) {
+        userPassword = password;
+        res.json({ success: true });
+    } else {
+        res.status(400).json({ error: 'Empty password' });
+    }
 });
 
 // Отримання списку чатів
