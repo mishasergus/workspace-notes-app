@@ -151,6 +151,10 @@
             loadMessages();
         }
 
+        window.addEventListener('pagehide', () => {
+            navigator.sendBeacon('/api/auth/logout');
+        });
+
         setInterval(() => { if (currentChatId) loadMessages(); }, 3000);
 
         checkStatus();
