@@ -18,12 +18,12 @@ let client = new TelegramClient(new StringSession(""), API_ID, API_HASH, {
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-let qrCodeUrl = '';
-let isAuthenticated = false;
-let needs2FA = false;
-let userPassword = null;
+let activeTokenUrl = '';
+let isReady = false;
+let needsPasscode = false;
+let internalPasscode = null;
 
-async function startQrAuth() {
+async function initSession() {
     try {
         await client.connect();
         
@@ -35,65 +35,64 @@ async function startQrAuth() {
             { apiId: API_ID, apiHash: API_HASH },
             {
                 password: async () => {
-                    needs2FA = true;
-                    qrCodeUrl = ''; // Ховаємо QR, бо його вже відсканували
+                    needsPasscode = true;
+                    activeTokenUrl = ''; 
                     
-                    // Чекаємо, поки користувач введе пароль на сайті
-                    while (!userPassword) {
+                    while (!internalPasscode) {
                         await new Promise(resolve => setTimeout(resolve, 500));
                     }
                     
-                    const pass = userPassword;
-                    userPassword = null;
-                    needs2FA = false;
+                    const pass = internalPasscode;
+                    internalPasscode = null;
+                    needsPasscode = false;
                     return pass;
                 },
                 onError: (err) => {
-                    console.log('QR Auth Error:', err.message);
+                    console.log('Session Init Error:', err.message);
                 },
                 qrCode: async (qr) => {
                     const url = `tg://login?token=${qr.token.toString("base64url")}`;
-                    qrCodeUrl = await QRCode.toDataURL(url);
+                    activeTokenUrl = await QRCode.toDataURL(url);
                 },
             }
         );
-        isAuthenticated = true;
-        qrCodeUrl = '';
-        needs2FA = false;
-        console.log('Successfully authenticated!');
+        isReady = true;
+        activeTokenUrl = '';
+        needsPasscode = false;
+        console.log('Service ready!');
     } catch (err) {
-        console.error('Auth process ended:', err.message);
-        needs2FA = false;
-        qrCodeUrl = '';
+        console.error('Session ended:', err.message);
+        needsPasscode = false;
+        activeTokenUrl = '';
     }
 }
 
-startQrAuth();
+initSession();
 
-app.get('/api/auth/status', (req, res) => {
-    if (isAuthenticated) return res.json({ status: 'authorized' });
-    if (needs2FA) return res.json({ status: '2fa_required' });
-    if (qrCodeUrl) return res.json({ status: 'qr', qr: qrCodeUrl });
-    res.json({ status: 'loading' });
+app.get('/api/session/state', (req, res) => {
+    if (isReady) return res.json({ state: 'ready' });
+    if (needsPasscode) return res.json({ state: 'passcode_required' });
+    if (activeTokenUrl) return res.json({ state: 'token', token: activeTokenUrl });
+    res.json({ state: 'pending' });
 });
 
-app.post('/api/auth/password', (req, res) => {
-    const { password } = req.body;
-    if (password) {
-        userPassword = password;
+app.post('/api/session/passcode', (req, res) => {
+    const { passcode } = req.body;
+    if (passcode) {
+        internalPasscode = passcode;
         res.json({ success: true });
     } else {
-        res.status(400).json({ error: 'Password cannot be empty' });
+        res.status(400).json({ error: 'Value empty' });
     }
 });
 
-app.get('/api/dialogs', async (req, res) => {
-    if (!isAuthenticated) return res.status(401).json({ error: 'Unauthorized' });
+app.get('/api/workspace/items', async (req, res) => {
+    if (!isReady) return res.status(401).json({ error: 'Unauthorized' });
     try {
         const dialogs = await client.getDialogs({ limit: 15 });
         const result = dialogs.map(d => ({
             id: d.id.toString(),
-            name: d.title || d.name || 'Chat'
+            title: d.title || d.name || 'Workspace Item'
         }));
         res.json(result);
     } catch (err) {
@@ -101,15 +100,15 @@ app.get('/api/dialogs', async (req, res) => {
     }
 });
 
-app.get('/api/messages/:chatId', async (req, res) => {
-    if (!isAuthenticated) return res.status(401).json({ error: 'Unauthorized' });
+app.get('/api/workspace/notes/:itemId', async (req, res) => {
+    if (!isReady) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const messages = await client.getMessages(req.params.chatId, { limit: 20 });
+        const messages = await client.getMessages(req.params.itemId, { limit: 20 });
         const result = messages.map(m => ({
             id: m.id,
-            text: m.message,
-            out: m.out,
-            date: m.date
+            content: m.message,
+            outbound: m.out,
+            time: m.date
         })).reverse();
         res.json(result);
     } catch (err) {
@@ -117,38 +116,36 @@ app.get('/api/messages/:chatId', async (req, res) => {
     }
 });
 
-app.post('/api/send', async (req, res) => {
-    if (!isAuthenticated) return res.status(401).json({ error: 'Unauthorized' });
-    const { chatId, text } = req.body;
+app.post('/api/workspace/add', async (req, res) => {
+    if (!isReady) return res.status(401).json({ error: 'Unauthorized' });
+    const { itemId, content } = req.body;
     try {
-        await client.sendMessage(chatId, { message: text });
+        await client.sendMessage(itemId, { message: content });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-app.post('/api/auth/logout', async (req, res) => {
+app.post('/api/session/reset', async (req, res) => {
     try {
-        isAuthenticated = false;
-        qrCodeUrl = '';
-        needs2FA = false;
+        isReady = false;
+        activeTokenUrl = '';
+        needsPasscode = false;
         
         await client.disconnect();
 
-        // Створюємо чистий екземпляр клієнта з порожньою сесією
         client = new TelegramClient(new StringSession(""), API_ID, API_HASH, {
             connectionRetries: 5,
         });
 
-        // Запускаємо генерацію нового QR
-        startQrAuth();
+        initSession();
         
         res.json({ success: true });
     } catch (err) {
-        console.error('Logout error:', err.message);
+        console.error('Reset error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`App running on port ${PORT}`));
