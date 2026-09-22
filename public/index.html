@@ -2,162 +2,162 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Workspace Messenger</title>
+    <title>Workspace Notes</title>
     <style>
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f4f9; }
-        #auth-screen { max-width: 400px; margin: 50px auto; text-align: center; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        #qr-image { width: 200px; display: none; margin: 15px auto; }
-        #2fa-box { display: none; margin-top: 15px; }
-        #2fa-box input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
-        #2fa-box button { width: 100%; padding: 10px; background: #0088cc; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        #connect-card { max-width: 400px; margin: 50px auto; text-align: center; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        #token-view { width: 200px; display: none; margin: 15px auto; }
+        #passcode-view { display: none; margin-top: 15px; }
+        #passcode-view input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        #passcode-view button { width: 100%; padding: 10px; background: #2b5278; color: white; border: none; border-radius: 4px; cursor: pointer; }
         
-        #main-app { display: none; height: 100vh; }
-        .app-container { display: flex; height: 100%; }
-        .sidebar { width: 300px; border-right: 1px solid #ccc; background: #fff; overflow-y: auto; }
-        .chat-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; }
-        .chat-item:hover, .chat-item.active { background: #e9f0f8; }
-        .chat-window { flex: 1; display: flex; flex-direction: column; background: #fff; }
-        .messages-box { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-        .msg { max-width: 70%; padding: 8px 12px; border-radius: 8px; word-break: break-word; }
-        .msg.in { background: #f1f1f1; align-self: flex-start; }
-        .msg.out { background: #0088cc; color: #fff; align-self: flex-end; }
-        .input-area { display: flex; padding: 10px; border-top: 1px solid #ccc; background: #fafafa; }
-        .input-area input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; outline: none; }
-        .input-area button { padding: 10px 20px; margin-left: 8px; background: #0088cc; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        #workspace-view { display: none; height: 100vh; }
+        .workspace-layout { display: flex; height: 100%; }
+        .nav-panel { width: 300px; border-right: 1px solid #ccc; background: #fff; overflow-y: auto; }
+        .item-card { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .item-card:hover, .item-card.active { background: #e9f0f8; }
+        .content-panel { flex: 1; display: flex; flex-direction: column; background: #fff; }
+        .notes-list { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .note-bubble { max-width: 70%; padding: 8px 12px; border-radius: 8px; word-break: break-word; }
+        .note-bubble.inbound { background: #f1f1f1; align-self: flex-start; }
+        .note-bubble.outbound { background: #2b5278; color: #fff; align-self: flex-end; }
+        .editor-bar { display: flex; padding: 10px; border-top: 1px solid #ccc; background: #fafafa; }
+        .editor-bar input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; outline: none; }
+        .editor-bar button { padding: 10px 20px; margin-left: 8px; background: #2b5278; color: white; border: none; border-radius: 4px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div id="auth-screen">
-        <h3>Авторизація Telegram</h3>
-        <p id="status-text">Завантаження...</p>
-        <img id="qr-image" src="" alt="QR Code">
+    <div id="connect-card">
+        <h3>Підключення Workspace</h3>
+        <p id="state-text">Завантаження...</p>
+        <img id="token-view" src="" alt="Token">
         
-        <div id="2fa-box">
-            <input type="password" id="pass-input" placeholder="Введіть 2FA пароль...">
-            <button onclick="sendPassword()">Увійти</button>
+        <div id="passcode-view">
+            <input type="password" id="passcode-input" placeholder="Введіть код підтвердження...">
+            <button onclick="submitPasscode()">Продовжити</button>
         </div>
     </div>
 
-    <div id="main-app">
-        <div class="app-container">
-            <div class="sidebar" id="chat-list"></div>
-            <div class="chat-window">
-                <div class="messages-box" id="messages-box">
-                    <p style="text-align:center; color:#888;">Оберіть чат для початку спілкування</p>
+    <div id="workspace-view">
+        <div class="workspace-layout">
+            <div class="nav-panel" id="nav-list"></div>
+            <div class="content-panel">
+                <div class="notes-list" id="notes-container">
+                    <p style="text-align:center; color:#888;">Оберіть розділ для перегляду нотаток</p>
                 </div>
-                <div class="input-area">
-                    <input type="text" id="msg-input" placeholder="Введіть повідомлення...">
-                    <button onclick="sendMsg()">Надіслати</button>
+                <div class="editor-bar">
+                    <input type="text" id="editor-input" placeholder="Введіть нотатку...">
+                    <button onclick="postNote()">Зберегти</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        let currentChatId = null;
+        let currentItemId = null;
 
-        async function checkStatus() {
+        async function syncState() {
             try {
-                const res = await fetch('/api/auth/status');
+                const res = await fetch('/api/session/state');
                 const data = await res.json();
                 
-                const qrImg = document.getElementById('qr-image');
-                const faBox = document.getElementById('2fa-box');
-                const statusText = document.getElementById('status-text');
+                const tokenImg = document.getElementById('token-view');
+                const passBox = document.getElementById('passcode-view');
+                const stateText = document.getElementById('state-text');
 
-                if (data.status === 'authorized') {
-                    document.getElementById('auth-screen').style.display = 'none';
-                    document.getElementById('main-app').style.display = 'block';
-                    loadDialogs();
-                    return; // Зупиняємо поллінг
+                if (data.state === 'ready') {
+                    document.getElementById('connect-card').style.display = 'none';
+                    document.getElementById('workspace-view').style.display = 'block';
+                    loadWorkspaceItems();
+                    return;
                 } 
                 
-                if (data.status === '2fa_required') {
-                    statusText.innerText = 'Введіть хмарний пароль (2FA):';
-                    qrImg.style.display = 'none';
-                    faBox.style.display = 'block';
-                } else if (data.status === 'qr') {
-                    statusText.innerText = 'Скануйте QR-код в Telegram:';
-                    qrImg.src = data.qr;
-                    qrImg.style.display = 'block';
-                    faBox.style.display = 'none';
+                if (data.state === 'passcode_required') {
+                    stateText.innerText = 'Введіть додатковий код захисту:';
+                    tokenImg.style.display = 'none';
+                    passBox.style.display = 'block';
+                } else if (data.state === 'token') {
+                    stateText.innerText = 'Скануйте маркер доступу:';
+                    tokenImg.src = data.token;
+                    tokenImg.style.display = 'block';
+                    passBox.style.display = 'none';
                 } else {
-                    statusText.innerText = 'Ініціалізація...';
+                    stateText.innerText = 'Ініціалізація...';
                 }
 
-                setTimeout(checkStatus, 2000);
+                setTimeout(syncState, 2000);
             } catch (err) { 
-                setTimeout(checkStatus, 3000); 
+                setTimeout(syncState, 3000); 
             }
         }
 
-        async function sendPassword() {
-            const password = document.getElementById('pass-input').value;
-            if (!password) return;
+        async function submitPasscode() {
+            const passcode = document.getElementById('passcode-input').value;
+            if (!passcode) return;
 
-            document.getElementById('status-text').innerText = 'Перевірка пароля...';
+            document.getElementById('state-text').innerText = 'Перевірка...';
             
-            await fetch('/api/auth/password', {
+            await fetch('/api/session/passcode', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password })
+                body: JSON.stringify({ passcode })
             });
 
-            document.getElementById('pass-input').value = '';
+            document.getElementById('passcode-input').value = '';
         }
 
-        async function loadDialogs() {
-            const res = await fetch('/api/dialogs');
-            const dialogs = await res.json();
-            const container = document.getElementById('chat-list');
-            container.innerHTML = dialogs.map(d => 
-                `<div class="chat-item" id="chat-${d.id}" onclick="selectChat('${d.id}')"><strong>${d.name}</strong></div>`
+        async function loadWorkspaceItems() {
+            const res = await fetch('/api/workspace/items');
+            const items = await res.json();
+            const container = document.getElementById('nav-list');
+            container.innerHTML = items.map(item => 
+                `<div class="item-card" id="item-${item.id}" onclick="selectItem('${item.id}')"><strong>${item.title}</strong></div>`
             ).join('');
         }
 
-        async function selectChat(chatId) {
-            currentChatId = chatId;
-            document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
-            const activeEl = document.getElementById(`chat-${chatId}`);
+        async function selectItem(itemId) {
+            currentItemId = itemId;
+            document.querySelectorAll('.item-card').forEach(el => el.classList.remove('active'));
+            const activeEl = document.getElementById(`item-${itemId}`);
             if (activeEl) activeEl.classList.add('active');
             
-            loadMessages();
+            loadNotes();
         }
 
-        async function loadMessages() {
-            if (!currentChatId) return;
-            const res = await fetch(`/api/messages/${currentChatId}`);
-            const messages = await res.json();
-            const box = document.getElementById('messages-box');
-            box.innerHTML = messages.map(m => 
-                `<div class="msg ${m.out ? 'out' : 'in'}">${m.text || '[Медіа/Стікер]'}</div>`
+        async function loadNotes() {
+            if (!currentItemId) return;
+            const res = await fetch(`/api/workspace/notes/${currentItemId}`);
+            const notes = await res.json();
+            const box = document.getElementById('notes-container');
+            box.innerHTML = notes.map(n => 
+                `<div class="note-bubble ${n.outbound ? 'outbound' : 'inbound'}">${n.content || '[Вкладення]'}</div>`
             ).join('');
             box.scrollTop = box.scrollHeight;
         }
 
-        async function sendMsg() {
-            const input = document.getElementById('msg-input');
-            const text = input.value.trim();
-            if (!text || !currentChatId) return;
+        async function postNote() {
+            const input = document.getElementById('editor-input');
+            const content = input.value.trim();
+            if (!content || !currentItemId) return;
             
             input.value = '';
-            await fetch('/api/send', {
+            await fetch('/api/workspace/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chatId: currentChatId, text })
+                body: JSON.stringify({ itemId: currentItemId, content })
             });
-            loadMessages();
+            loadNotes();
         }
 
         window.addEventListener('pagehide', () => {
-            navigator.sendBeacon('/api/auth/logout');
+            navigator.sendBeacon('/api/session/reset');
         });
 
-        setInterval(() => { if (currentChatId) loadMessages(); }, 3000);
+        setInterval(() => { if (currentItemId) loadNotes(); }, 3000);
 
-        checkStatus();
+        syncState();
     </script>
 </body>
 </html>
